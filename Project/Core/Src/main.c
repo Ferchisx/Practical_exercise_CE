@@ -40,21 +40,68 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+//uint32_t toggles = 0;
+uint32_t izq = 0;
+uint32_t der = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin==B1_Pin){
+		izq=1;
+	}
+	if(GPIO_Pin==B2_Pin){
+		der=1;
+	}
+}
 
+//void heartbeat(void){
+//	static uint32_t heartbeat_tick=0;
+//	if(heartbeat_tick<HAL_GetTick()){
+//		heartbeat_tick=HAL_GetTick()+500;
+//		HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
+//	}
+//}
+
+void turn_signal_left(void){
+	static uint32_t toggle_tick=0;
+	static uint32_t toggles = 6;
+	HAL_UART_Transmit(&huart2,"Left Signal\r\n",14,10);
+	while(toggles>0){
+		if(toggle_tick<HAL_GetTick()){
+			toggle_tick=HAL_GetTick()+500;
+			HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
+		}
+		toggles--;
+	}
+}
+
+void turn_signal_right(void){
+	static uint32_t toggle_tick=0;
+	static uint32_t toggles = 6;
+	if(toggle_tick<HAL_GetTick() && toggles>0){
+		toggle_tick=HAL_GetTick()+500;
+		HAL_GPIO_TogglePin(LED2_GPIO_Port,LED2_Pin);
+		HAL_UART_Transmit(&huart2,"Right Signal\r\n",14,10);
+		toggles--;
+	}
+	if(toggles==0){
+		der=1;
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -85,6 +132,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -93,6 +141,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if(izq==1){
+		  turn_signal_left();
+		  izq=0;
+	  }
+	  if(der==1){
+		  turn_signal_right();
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -150,6 +205,41 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -180,7 +270,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : B1A1_Pin */
   GPIO_InitStruct.Pin = B1A1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1A1_GPIO_Port, &GPIO_InitStruct);
 
@@ -191,17 +281,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USART_RX_Pin */
-  GPIO_InitStruct.Pin = USART_RX_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
-  HAL_GPIO_Init(USART_RX_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pin : B2_Pin */
   GPIO_InitStruct.Pin = B2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B2_GPIO_Port, &GPIO_InitStruct);
 
@@ -211,6 +293,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED2_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
