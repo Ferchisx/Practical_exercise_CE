@@ -46,6 +46,8 @@ UART_HandleTypeDef huart2;
 //uint32_t toggles = 0;
 uint32_t izq = 0;
 uint32_t der = 0;
+uint32_t toggles1 = 0;
+uint32_t toggles2 = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,47 +60,40 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	UNUSED(GPIO_Pin);
 	if(GPIO_Pin==B1_Pin){
+		HAL_UART_Transmit(&huart2,"Left Signal\r\n",13,10);
 		izq=1;
+		toggles1 = 6;
 	}
 	if(GPIO_Pin==B2_Pin){
+		HAL_UART_Transmit(&huart2,"Right Signal\r\n",14,10);
 		der=1;
+		toggles2 = 6;
 	}
 }
 
-//void heartbeat(void){
-//	static uint32_t heartbeat_tick=0;
-//	if(heartbeat_tick<HAL_GetTick()){
-//		heartbeat_tick=HAL_GetTick()+500;
-//		HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
-//	}
-//}
-
 void turn_signal_left(void){
 	static uint32_t toggle_tick=0;
-	static uint32_t toggles = 6;
-	HAL_UART_Transmit(&huart2,"Left Signal\r\n",14,10);
-	while(toggles>0){
-		if(toggle_tick<HAL_GetTick()){
-			toggle_tick=HAL_GetTick()+500;
-			HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
-		}
-		toggles--;
+	if(toggle_tick<HAL_GetTick() && toggles1>0){
+		toggle_tick=HAL_GetTick()+500;
+		HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
+		toggles1--;
+	}
+	if(toggles1==0){
+		izq=1;
 	}
 }
 
 void turn_signal_right(void){
 	static uint32_t toggle_tick=0;
-	static uint32_t toggles = 6;
-	if(toggle_tick<HAL_GetTick() && toggles>0){
+	if(toggle_tick<HAL_GetTick() && toggles2>0){
 		toggle_tick=HAL_GetTick()+500;
 		HAL_GPIO_TogglePin(LED2_GPIO_Port,LED2_Pin);
-		HAL_UART_Transmit(&huart2,"Right Signal\r\n",14,10);
-		toggles--;
+		toggles2--;
 	}
-	if(toggles==0){
+	if(toggles2==0){
 		der=1;
 	}
 }
@@ -143,7 +138,6 @@ int main(void)
   {
 	  if(izq==1){
 		  turn_signal_left();
-		  izq=0;
 	  }
 	  if(der==1){
 		  turn_signal_right();
@@ -257,22 +251,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : B1A1_Pin */
-  GPIO_InitStruct.Pin = B1A1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1A1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED1_Pin */
   GPIO_InitStruct.Pin = LED1_Pin;
